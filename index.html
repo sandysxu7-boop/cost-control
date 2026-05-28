@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>采购四组 · 降本成本台账</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;background:#f0f2f5;color:#111827;font-size:14px}
+.hd{background:linear-gradient(135deg,#0f172a,#1a3353);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:200}
+.hd-left h1{color:#fff;font-size:17px;font-weight:700;letter-spacing:.3px}
+.hd-left p{color:rgba(255,255,255,.45);font-size:11px;margin-top:2px}
+.hd-right{display:flex;gap:8px;align-items:center}
+.sdot{width:8px;height:8px;border-radius:50%;background:#6b7280;display:inline-block;margin-right:4px;flex-shrink:0}
+.sdot.ok{background:#10b981;box-shadow:0 0 6px #10b98180}
+.sdot.err{background:#ef4444}
+.slbl{font-size:11px;color:rgba(255,255,255,.55)}
+.btn{padding:6px 14px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;border:none;transition:all .15s}
+.btn-ghost{background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.18)}
+.btn-ghost:hover{background:rgba(255,255,255,.18)}
+.uchip{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);border-radius:20px;padding:3px 11px;color:#fff;font-size:12px}
+/* KPI */
+.kpi-strip{display:grid;grid-template-columns:repeat(6,1fr);background:#fff;border-bottom:1px solid #e5e7eb}
+.kpi{padding:12px 16px;border-right:1px solid #f3f4f6;cursor:pointer;transition:background .15s}
+.kpi:last-child{border-right:none}
+.kpi:hover{background:#f9fafb}
+.kpi-lbl{font-size:10px;color:#6b7280;letter-spacing:.3px;text-transform:uppercase}
+.kpi-val{font-size:22px;font-weight:700;color:#111827;line-height:1.15;margin:3px 0 1px}
+.kpi-sub{font-size:10px;color:#9ca3af}
+.kpi-val.g{color:#059669} .kpi-val.r{color:#dc2626} .kpi-val.b{color:#2563eb} .kpi-val.o{color:#d97706}
+/* TABS */
+.tab-bar{display:flex;background:#fff;border-bottom:2px solid #e5e7eb;padding:0 24px;overflow-x:auto}
+.tab{padding:11px 18px;font-size:13px;font-weight:500;color:#6b7280;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;transition:all .15s;white-space:nowrap}
+.tab:hover{color:#1a3353}
+.tab.active{color:#1a3353;border-bottom-color:#1a3353;font-weight:600}
+/* PAGE */
+.page{display:none;padding:20px 24px;min-height:calc(100vh - 180px)}
+.page.active{display:block}
+/* CARD */
+.card{background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.07);margin-bottom:16px}
+.card-head{padding:12px 16px;border-bottom:1px solid #f3f4f6;display:flex;align-items:center;justify-content:space-between}
+.card-head h3{font-size:13px;font-weight:600;color:#111827}
+.card-body{padding:16px}
+/* GRID */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+@media(max-width:900px){.g2,.g3{grid-template-columns:1fr}.kpi-strip{grid-template-columns:repeat(3,1fr)}}
+/* FILTER */
+.fbar{display:flex;gap:8px;flex-wrap:wrap;padding:10px 16px;border-bottom:1px solid #f3f4f6;background:#fafafa;align-items:center}
+.fbar input,.fbar select{border:1px solid #e5e7eb;border-radius:6px;padding:5px 9px;font-size:12px;color:#374151;outline:none;background:#fff}
+.fbar input:focus,.fbar select:focus{border-color:#2563eb}
+.fbar input[type=text]{width:200px}
+.cbadge{background:#f3f4f6;color:#374151;font-size:11px;padding:2px 9px;border-radius:12px;font-weight:600}
+/* TABLE */
+.tw{overflow:auto}
+.tbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.tbl th{background:#f9fafb;padding:8px 11px;text-align:left;font-weight:600;color:#374151;font-size:11px;text-transform:uppercase;letter-spacing:.3px;border-bottom:1px solid #e5e7eb;white-space:nowrap}
+.tbl td{padding:8px 11px;border-bottom:1px solid #f7f8f9;vertical-align:middle}
+.tbl tr:hover td{background:#fafbff}
+.tbl .nr{text-align:right;font-variant-numeric:tabular-nums}
+.tbl .mu{color:#9ca3af;font-size:11px}
+/* BADGE */
+.badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;white-space:nowrap}
+.b-主导者{background:#dcfce7;color:#15803d}
+.b-谈判者{background:#dbeafe;color:#1d4ed8}
+.b-执行者{background:#fef3c7;color:#92400e}
+.b-未填{background:#f3f4f6;color:#6b7280}
+/* PROGRESS BAR */
+.pbar-wrap{background:#f3f4f6;border-radius:4px;height:6px;overflow:hidden;width:100%;min-width:60px}
+.pbar{height:100%;border-radius:4px;background:#2563eb}
+.pbar.g{background:#059669} .pbar.o{background:#d97706} .pbar.r{background:#dc2626}
+/* FY BADGE */
+.fy-badge{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:8px;font-size:11px;font-weight:700}
+.fy27{background:#dbeafe;color:#1e40af}
+.fy28{background:#fef3c7;color:#92400e}
+.fy29{background:#f3e8ff;color:#6b21a8}
+/* RANK TABLE */
+.rank-row{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #f3f4f6}
+.rank-row:last-child{border-bottom:none}
+.rank-no{width:22px;height:22px;border-radius:50%;background:#f3f4f6;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#6b7280;flex-shrink:0}
+.rank-no.top{background:#fbbf24;color:#fff}
+.rank-name{flex:1;font-size:12px;font-weight:600;color:#111827}
+.rank-val{font-size:12px;font-weight:700;color:#059669;white-space:nowrap}
+.rank-sub{font-size:10px;color:#9ca3af}
+/* CHART WRAP */
+.cw{position:relative;height:220px} .cw.tall{height:270px} .cw.sm{height:180px}
+/* AUTH */
+#authScreen{position:fixed;inset:0;background:#0f172a;display:flex;align-items:center;justify-content:center;z-index:1000}
+#authScreen.hidden{display:none}
+.auth-box{text-align:center;max-width:340px}
+.auth-icon{font-size:36px;margin-bottom:14px}
+.auth-title{color:#fff;font-size:20px;font-weight:700;margin-bottom:6px}
+.auth-sub{color:rgba(255,255,255,.45);font-size:13px;margin-bottom:26px}
+.auth-spin{width:38px;height:38px;border:3px solid rgba(255,255,255,.15);border-top-color:#60a5fa;border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 14px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.auth-msg{color:rgba(255,255,255,.6);font-size:13px}
+.auth-err{color:#f87171;font-size:13px}
+/* LOADER */
+#loaderOv{position:fixed;inset:0;background:rgba(255,255,255,.7);display:flex;align-items:center;justify-content:center;z-index:500}
+#loaderOv.hidden{display:none}
+.ld-box{text-align:center}
+.ld-spin{width:30px;height:30px;border:3px solid #e5e7eb;border-top-color:#2563eb;border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 8px}
+#ldTxt{font-size:13px;color:#6b7280}
+/* TOAST */
+#toastArea{position:fixed;bottom:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:6px}
+.toast{padding:9px 14px;border-radius:8px;font-size:12px;font-weight:600;box-shadow:0 4px 12px rgba(0,0,0,.15);animation:fadeIn .2s}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}}
+.toast-ok{background:#059669;color:#fff} .toast-err{background:#dc2626;color:#fff} .toast-info{background:#1d4ed8;color:#fff}
+/* STAT CARDS */
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+.stat-card{background:#f9fafb;border-radius:8px;padding:10px 14px}
+.sc-lbl{font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:.3px}
+.sc-val{font-size:17px;font-weight:700;color:#111827;margin-top:3px}
+.sc-sub{font-size:10px;color:#9ca3af;margin-top:1px}
+</style>
+</head>
+<body>
+
+<div id="authScreen">
+  <div class="auth-box">
+    <div class="auth-icon">📉</div>
+    <div class="auth-title">采购四组降本台账</div>
+    <div class="auth-sub">成本控制 · 降本分析</div>
+    <div class="auth-spin" id="authSpin"></div>
+    <div class="auth-msg" id="authMsg">正在验证身份…</div>
+  </div>
+</div>
+
+<div id="loaderOv" class="hidden">
+  <div class="ld-box"><div class="ld-spin"></div><div id="ldTxt">加载中…</div></div>
+</div>
+
+<div id="toastArea"></div>
+
+<div id="mainApp" style="display:none">
+  <div class="hd">
+    <div class="hd-left">
+      <h1>📉 采购四组 · 降本成本台账</h1>
+      <p>集团采购四组 · 只读监控 · 数据源：成本台账</p>
+    </div>
+    <div class="hd-right">
+      <span class="sdot" id="sdot"></span>
+      <span class="slbl" id="slbl">–</span>
+      <span class="uchip" id="uchip">–</span>
+      <button class="btn btn-ghost" onclick="refreshData()">刷新</button>
+    </div>
+  </div>
+
+  <div class="kpi-strip">
+    <div class="kpi" onclick="showPage('list')">
+      <div class="kpi-lbl">总项目数</div>
+      <div class="kpi-val" id="k-total">–</div>
+      <div class="kpi-sub">集团采购四组</div>
+    </div>
+    <div class="kpi" onclick="showPage('analysis')">
+      <div class="kpi-lbl">FY27 降本金额</div>
+      <div class="kpi-val g" id="k-fy27">–</div>
+      <div class="kpi-sub">万元</div>
+    </div>
+    <div class="kpi" onclick="showPage('analysis')">
+      <div class="kpi-lbl">系统降本金额</div>
+      <div class="kpi-val b" id="k-sys">–</div>
+      <div class="kpi-sub">万元（全口径）</div>
+    </div>
+    <div class="kpi" onclick="showPage('analysis')">
+      <div class="kpi-lbl">平均降本率</div>
+      <div class="kpi-val g" id="k-rate">–</div>
+      <div class="kpi-sub">降本额/中标价</div>
+    </div>
+    <div class="kpi" onclick="showPage('analysis')">
+      <div class="kpi-lbl">中标总金额</div>
+      <div class="kpi-val" id="k-award">–</div>
+      <div class="kpi-sub">万元</div>
+    </div>
+    <div class="kpi" onclick="showPage('analysis')">
+      <div class="kpi-lbl">FY28 预估降本</div>
+      <div class="kpi-val o" id="k-fy28">–</div>
+      <div class="kpi-sub">万元（预估）</div>
+    </div>
+  </div>
+
+  <div class="tab-bar">
+    <div class="tab active" id="tab-overview" onclick="showPage('overview')">概览</div>
+    <div class="tab" id="tab-analysis" onclick="showPage('analysis')">降本分析</div>
+    <div class="tab" id="tab-buyer" onclick="showPage('buyer')">采购员绩效</div>
+    <div class="tab" id="tab-list" onclick="showPage('list')">项目列表</div>
+  </div>
+
+  <!-- ── 概览 ── -->
+  <div class="page active" id="pg-overview">
+    <div class="g2">
+      <div class="card">
+        <div class="card-head"><h3>财年降本金额对比</h3></div>
+        <div class="card-body"><div class="cw"><canvas id="cFY"></canvas></div></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>核心降本方式分布</h3></div>
+        <div class="card-body"><div class="cw"><canvas id="cWay"></canvas></div></div>
+      </div>
+    </div>
+    <div class="g2">
+      <div class="card">
+        <div class="card-head"><h3>月度立项趋势</h3></div>
+        <div class="card-body"><div class="cw"><canvas id="cMonth"></canvas></div></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>项目角色分布</h3></div>
+        <div class="card-body"><div class="cw"><canvas id="cRole"></canvas></div></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h3>降本金额 Top 10 采购员</h3></div>
+      <div class="card-body" id="rankList"></div>
+    </div>
+  </div>
+
+  <!-- ── 降本分析 ── -->
+  <div class="page" id="pg-analysis">
+    <div class="stat-grid" id="fyStatCards"></div>
+    <div class="g2">
+      <div class="card">
+        <div class="card-head"><h3>品类降本金额分布</h3></div>
+        <div class="card-body"><div class="cw tall"><canvas id="cCat"></canvas></div></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>降本率区间分布</h3></div>
+        <div class="card-body"><div class="cw tall"><canvas id="cRateDist"></canvas></div></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h3>品类详细降本统计</h3></div>
+      <div class="tw">
+        <table class="tbl">
+          <thead><tr>
+            <th>采购品类</th>
+            <th style="text-align:right">项目数</th>
+            <th style="text-align:right">系统降本 (元)</th>
+            <th style="text-align:right">FY27降本 (元)</th>
+            <th style="text-align:right">中标总额 (元)</th>
+            <th style="text-align:right">平均降本率</th>
+            <th>主要降本方式</th>
+          </tr></thead>
+          <tbody id="tbCat"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 采购员绩效 ── -->
+  <div class="page" id="pg-buyer">
+    <div class="card">
+      <div class="card-head"><h3>采购员降本绩效全览</h3></div>
+      <div class="tw">
+        <table class="tbl">
+          <thead><tr>
+            <th>采购员</th>
+            <th style="text-align:right">项目数</th>
+            <th style="text-align:right">系统降本 (元)</th>
+            <th style="text-align:right">FY27降本 (元)</th>
+            <th style="text-align:right">FY28预估 (元)</th>
+            <th style="text-align:right">中标总额 (元)</th>
+            <th style="text-align:right">平均降本率</th>
+            <th>主要角色</th>
+            <th>主要品类</th>
+          </tr></thead>
+          <tbody id="tbBuyer"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="g2">
+      <div class="card">
+        <div class="card-head"><h3>人均系统降本金额 Top 10</h3></div>
+        <div class="card-body"><div class="cw tall"><canvas id="cBuyerAmt"></canvas></div></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>人均降本率 Top 10</h3></div>
+        <div class="card-body"><div class="cw tall"><canvas id="cBuyerRate"></canvas></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 项目列表 ── -->
+  <div class="page" id="pg-list">
+    <div class="card">
+      <div class="fbar">
+        <input type="text" id="fSearch" placeholder="搜索项目名称/立项单号/供应商…" oninput="renderList()">
+        <select id="fCat" onchange="renderList()"><option value="">所有品类</option></select>
+        <select id="fRole" onchange="renderList()">
+          <option value="">所有角色</option>
+          <option>主导者</option><option>谈判者</option><option>执行者</option>
+        </select>
+        <select id="fBuyer" onchange="renderList()"><option value="">所有采购员</option></select>
+        <span class="cbadge" id="lCount">–</span>
+      </div>
+      <div class="tw">
+        <table class="tbl">
+          <thead><tr>
+            <th>项目名称</th>
+            <th>采购员</th>
+            <th>品类</th>
+            <th>角色</th>
+            <th style="text-align:right">系统降本 (元)</th>
+            <th style="text-align:right">降本率</th>
+            <th style="text-align:right">中标总额 (元)</th>
+            <th>核心降本方式</th>
+            <th>立项时间</th>
+            <th>供应商</th>
+          </tr></thead>
+          <tbody id="tbList"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const FC_BASE  = 'https://sso-backend-vaxetvknoh.cn-hangzhou.fcapp.run';
+const TABLE_ID = 'tbl4e5Cuu6nlNw19uqz';
+const JWT_KEY  = 'lcpm_sso_jwt';
+const SSO_APP_ID = 'abb8d18a9d2a1008';
+const ORG_FILTER = '集团采购四组';
+
+let allRecords = [], currentUser = null;
+const ci = {};
+let pageRendered = {};
+
+/* ── SSO ── */
+async function initSSO() {
+  const p = new URLSearchParams(window.location.search);
+  const ssoTok = p.get('token');
+  if (ssoTok) {
+    setAuthMsg('正在验证 SSO token…');
+    try {
+      const r = await fetch(`${FC_BASE}/auth/callback?token=${encodeURIComponent(ssoTok)}`);
+      const d = await r.json();
+      if (!r.ok || d.error) throw new Error(d.error || '验证失败');
+      localStorage.setItem(JWT_KEY, d.token);
+      currentUser = d.user;
+      window.history.replaceState({}, '', window.location.pathname);
+    } catch(e) { setAuthMsg('SSO 失败：' + e.message, true); return; }
+  }
+  const jwt = localStorage.getItem(JWT_KEY);
+  if (!jwt) { redirectSSO(); return; }
+  try {
+    const parts = jwt.split('.');
+    const pl = JSON.parse(atob(parts[1].replace(/-/g,'+').replace(/_/g,'/')));
+    if (pl.exp * 1000 < Date.now()) { localStorage.removeItem(JWT_KEY); redirectSSO(); return; }
+    currentUser = currentUser || pl;
+  } catch { localStorage.removeItem(JWT_KEY); redirectSSO(); return; }
+  await loadApp();
+}
+
+function redirectSSO() {
+  setAuthMsg('正在跳转统一登录…');
+  window.location.href = `https://sso.100tal.com/sso/login?appid=${SSO_APP_ID}&redirect_uri=${encodeURIComponent(window.location.href)}`;
+}
+function setAuthMsg(msg, err) {
+  document.getElementById('authMsg').textContent = msg;
+  if (err) { document.getElementById('authMsg').className = 'auth-err'; document.getElementById('authSpin').style.display = 'none'; }
+}
+
+/* ── DATA ── */
+async function teableGet(path) {
+  const jwt = localStorage.getItem(JWT_KEY);
+  const r = await fetch(`${FC_BASE}/teable/cost${path}`, { headers: { 'Authorization': `Bearer ${jwt}` } });
+  if (!r.ok) { const t = await r.text(); throw new Error(`HTTP ${r.status}: ${t.slice(0,100)}`); }
+  return r.json();
+}
+
+async function loadAllRecords() {
+  let records = [], skip = 0;
+  while (true) {
+    const d = await teableGet(`/api/table/${TABLE_ID}/record?take=1000&skip=${skip}&fieldKeyType=name`);
+    const batch = d.records || [];
+    records = records.concat(batch);
+    if (batch.length < 1000) break;
+    skip += 1000;
+  }
+  return records.filter(r => (r.fields['⭐采购组织'] || '') === ORG_FILTER).map(norm);
+}
+
+function norm(r) {
+  const f = r.fields || {};
+  const dn = parseFloat(f['系统降本金额 CNY']) || 0;
+  const fy27 = parseFloat(f['⭐⭐⭐FY27调整后准确的降本金额（核对后合同未来一年周期降本金额）']) || parseFloat(f['🤖【自动】FY27预估降本金额（2.28口径系统计算金额）']) || 0;
+  const fy28 = parseFloat(f['⭐⭐⭐FY28预估降本金额（合同预估FY28一年周期降本金额）']) || parseFloat(f['🤖【自动】FY28预估降本金额（2.28口径系统计算金额）']) || 0;
+  const fy29 = parseFloat(f['⭐⭐⭐FY29预估降本金额（合同预估FY29一年周期降本金额）']) || parseFloat(f['🤖【自动】FY29预估降本金额（2.28口径系统计算金额）']) || 0;
+  const award = parseFloat(f['中标总金额 CNY']) || 0;
+  const rate  = dn > 0 && award > 0 ? dn / (award + dn) : (parseFloat(f['🚩降本率']) || 0);
+  const ways  = f['⭐⭐⭐核心降本方式'];
+  const cat   = f['⭐⭐⭐采购品类（大类）'] || f['一级品类'] || '未分类';
+  const createDate = f['⭐立项单创建时间'] ? new Date(f['⭐立项单创建时间']) : null;
+  return {
+    id: r.id,
+    name: f['项目名称'] || '—',
+    searchId: f['检索值'] || f['立项单号'] || '',
+    buyer: f['采购员名称'] || '未知',
+    buyerCode: f['采购员工号'] || '',
+    cat,
+    role: f['⭐在项目中的角色'] || '未填',
+    dn, fy27, fy28, fy29, award, rate,
+    ways: Array.isArray(ways) ? ways : (ways ? [ways] : []),
+    supplier: f['中标供应商名称'] || '',
+    contractType: f['合同类型'] || '',
+    savingMethod: f['成本核算节约方式'] || '',
+    createDate,
+    createDateStr: createDate ? createDate.toISOString().slice(0,7) : '',
+    awardDate: f['⭐授标时间'] ? new Date(f['⭐授标时间']) : null,
+    dept: f['需求部门（三级）'] || '',
+    measures: f['⭐⭐⭐具体降本举措'] || '',
+  };
+}
+
+/* ── INIT ── */
+async function loadApp() {
+  document.getElementById('authScreen').classList.add('hidden');
+  document.getElementById('mainApp').style.display = '';
+  document.getElementById('uchip').textContent = currentUser.name || '用户';
+  try {
+    setLoader('正在加载成本台账数据…');
+    allRecords = await loadAllRecords();
+    hideLoader();
+    setStatus(true, `${allRecords.length} 条记录`);
+    updateKPIs();
+    populateFilters();
+    renderOverview();
+    showPage('overview');
+  } catch(e) {
+    hideLoader();
+    setStatus(false, '加载失败');
+    showToast('加载失败：' + e.message, 'err');
+    document.getElementById('authScreen').classList.remove('hidden');
+    document.getElementById('mainApp').style.display = 'none';
+    setAuthMsg('数据加载失败：' + e.message, true);
+  }
+}
+
+/* ── KPIs ── */
+function updateKPIs() {
+  const n = allRecords.length;
+  const fy27  = allRecords.reduce((s,r)=>s+r.fy27,0);
+  const fy28  = allRecords.reduce((s,r)=>s+r.fy28,0);
+  const sys   = allRecords.reduce((s,r)=>s+r.dn,0);
+  const award = allRecords.reduce((s,r)=>s+r.award,0);
+  const rates = allRecords.filter(r=>r.rate>0).map(r=>r.rate);
+  const avgRate = rates.length ? rates.reduce((s,v)=>s+v,0)/rates.length : 0;
+  document.getElementById('k-total').textContent = n;
+  document.getElementById('k-fy27').textContent  = (fy27/1e4).toFixed(1)+'万';
+  document.getElementById('k-sys').textContent   = (sys/1e4).toFixed(1)+'万';
+  document.getElementById('k-rate').textContent  = (avgRate*100).toFixed(2)+'%';
+  document.getElementById('k-award').textContent = (award/1e4).toFixed(0)+'万';
+  document.getElementById('k-fy28').textContent  = (fy28/1e4).toFixed(1)+'万';
+}
+
+/* ── OVERVIEW ── */
+function renderOverview() {
+  renderFYChart();
+  renderWayChart();
+  renderMonthChart();
+  renderRoleChart();
+  renderRankList();
+}
+
+function renderFYChart() {
+  const fy27 = allRecords.reduce((s,r)=>s+r.fy27,0);
+  const fy28 = allRecords.reduce((s,r)=>s+r.fy28,0);
+  const fy29 = allRecords.reduce((s,r)=>s+r.fy29,0);
+  const sys  = allRecords.reduce((s,r)=>s+r.dn,0);
+  if (ci.fy) ci.fy.destroy();
+  ci.fy = new Chart(document.getElementById('cFY'), {
+    type: 'bar',
+    data: {
+      labels: ['系统降本', 'FY27 降本', 'FY28 预估', 'FY29 预估'],
+      datasets: [{ data: [sys,fy27,fy28,fy29],
+        backgroundColor: ['#60a5fa','#34d399','#fbbf24','#c084fc'], borderRadius: 6 }]
+    },
+    options: { responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false} },
+      scales:{ y:{ ticks:{ callback:v=>(v/1e4).toFixed(0)+'万' } } } }
+  });
+}
+
+function renderWayChart() {
+  const cnt = {};
+  allRecords.forEach(r => r.ways.forEach(w => { cnt[w]=(cnt[w]||0)+1; }));
+  const sorted = Object.entries(cnt).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  if (ci.way) ci.way.destroy();
+  ci.way = new Chart(document.getElementById('cWay'), {
+    type: 'doughnut',
+    data: { labels: sorted.map(x=>x[0]), datasets:[{ data:sorted.map(x=>x[1]),
+      backgroundColor:['#3b82f6','#10b981','#f59e0b','#8b5cf6','#ef4444','#06b6d4','#ec4899','#84cc16'],
+      borderWidth:2, borderColor:'#fff' }] },
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ position:'right', labels:{ font:{size:10}, boxWidth:10 } } } }
+  });
+}
+
+function renderMonthChart() {
+  const months = {};
+  allRecords.forEach(r => { if (r.createDateStr) months[r.createDateStr]=(months[r.createDateStr]||0)+1; });
+  const sorted = Object.entries(months).sort((a,b)=>a[0].localeCompare(b[0])).slice(-18);
+  if (ci.month) ci.month.destroy();
+  ci.month = new Chart(document.getElementById('cMonth'), {
+    type:'line',
+    data:{ labels:sorted.map(x=>x[0]),
+      datasets:[{ label:'立项数', data:sorted.map(x=>x[1]),
+        borderColor:'#2563eb', backgroundColor:'rgba(37,99,235,.1)', fill:true, tension:.3, pointRadius:3 }] },
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{y:{ticks:{stepSize:1}}} }
+  });
+}
+
+function renderRoleChart() {
+  const cnt = {};
+  allRecords.forEach(r => { const k=r.role||'未填'; cnt[k]=(cnt[k]||0)+1; });
+  if (ci.role) ci.role.destroy();
+  ci.role = new Chart(document.getElementById('cRole'), {
+    type:'doughnut',
+    data:{ labels:Object.keys(cnt), datasets:[{ data:Object.values(cnt),
+      backgroundColor:['#34d399','#60a5fa','#fbbf24','#9ca3af'], borderWidth:2, borderColor:'#fff' }] },
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ position:'bottom', labels:{font:{size:11}} } } }
+  });
+}
+
+function renderRankList() {
+  const buyers = {};
+  allRecords.forEach(r => {
+    if (!buyers[r.buyer]) buyers[r.buyer]={dn:0,fy27:0,cnt:0};
+    buyers[r.buyer].dn   += r.dn;
+    buyers[r.buyer].fy27 += r.fy27;
+    buyers[r.buyer].cnt  ++;
+  });
+  const sorted = Object.entries(buyers).sort((a,b)=>b[1].dn-a[1].dn).slice(0,10);
+  const max = sorted[0]?.[1].dn || 1;
+  document.getElementById('rankList').innerHTML = sorted.map(([name,d],i) => `
+    <div class="rank-row">
+      <div class="rank-no ${i<3?'top':''}">${i+1}</div>
+      <div style="flex:1">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+          <span class="rank-name">${escH(name)}</span>
+          <span class="rank-val">${fmtW(d.dn)}</span>
+        </div>
+        <div class="pbar-wrap"><div class="pbar g" style="width:${(d.dn/max*100).toFixed(1)}%"></div></div>
+        <div class="rank-sub" style="margin-top:3px">${d.cnt}个项目 · FY27 ${fmtW(d.fy27)}</div>
+      </div>
+    </div>`).join('');
+}
+
+/* ── ANALYSIS ── */
+function renderAnalysis() {
+  renderFYStatCards();
+  renderCatChart();
+  renderRateDistChart();
+  renderCatTable();
+}
+
+function renderFYStatCards() {
+  const fy27 = allRecords.reduce((s,r)=>s+r.fy27,0);
+  const fy28 = allRecords.reduce((s,r)=>s+r.fy28,0);
+  const fy29 = allRecords.reduce((s,r)=>s+r.fy29,0);
+  const sys  = allRecords.reduce((s,r)=>s+r.dn,0);
+  document.getElementById('fyStatCards').innerHTML = [
+    {lbl:'系统降本合计',val:fmtW(sys),sub:'全口径',cls:''},
+    {lbl:'FY27 核准降本',val:fmtW(fy27),sub:'调整后实际值',cls:'fy27'},
+    {lbl:'FY28 预估降本',val:fmtW(fy28),sub:'合同预估',cls:'fy28'},
+    {lbl:'FY29 预估降本',val:fmtW(fy29),sub:'合同预估',cls:'fy29'},
+  ].map(s=>`<div class="stat-card">
+    <div class="sc-lbl">${s.lbl}</div>
+    <div class="sc-val ${s.cls}">${s.val}</div>
+    <div class="sc-sub">${s.sub}</div>
+  </div>`).join('');
+}
+
+function renderCatChart() {
+  const cats = {};
+  allRecords.forEach(r => { if (!cats[r.cat]) cats[r.cat]={dn:0,fy27:0}; cats[r.cat].dn+=r.dn; cats[r.cat].fy27+=r.fy27; });
+  const sorted = Object.entries(cats).sort((a,b)=>b[1].dn-a[1].dn);
+  if (ci.cat) ci.cat.destroy();
+  ci.cat = new Chart(document.getElementById('cCat'), {
+    type:'bar',
+    data:{ labels:sorted.map(x=>x[0]),
+      datasets:[
+        { label:'系统降本', data:sorted.map(x=>x[1].dn), backgroundColor:'#60a5fa', borderRadius:3 },
+        { label:'FY27降本', data:sorted.map(x=>x[1].fy27), backgroundColor:'#34d399', borderRadius:3 },
+      ] },
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{position:'top',labels:{font:{size:11}}}},
+      scales:{y:{ticks:{callback:v=>fmtW(v)}}} }
+  });
+}
+
+function renderRateDistChart() {
+  const brackets = [0,.02,.05,.08,.12,.18,.25,1];
+  const labels = ['<2%','2-5%','5-8%','8-12%','12-18%','18-25%','>25%'];
+  const counts = new Array(7).fill(0);
+  allRecords.forEach(r => {
+    if (!r.rate) return;
+    for (let i=0;i<brackets.length-1;i++) if (r.rate>=brackets[i]&&r.rate<brackets[i+1]) { counts[i]++; break; }
+  });
+  if (ci.ratedist) ci.ratedist.destroy();
+  ci.ratedist = new Chart(document.getElementById('cRateDist'), {
+    type:'bar',
+    data:{ labels, datasets:[{ label:'项目数', data:counts, backgroundColor:'#8b5cf6', borderRadius:4 }] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+      scales:{y:{ticks:{stepSize:1}}} }
+  });
+}
+
+function renderCatTable() {
+  const cats = {};
+  allRecords.forEach(r => {
+    const k = r.cat;
+    if (!cats[k]) cats[k] = {cnt:0,dn:0,fy27:0,award:0,rates:[],ways:{}};
+    cats[k].cnt++; cats[k].dn+=r.dn; cats[k].fy27+=r.fy27; cats[k].award+=r.award;
+    if (r.rate>0) cats[k].rates.push(r.rate);
+    r.ways.forEach(w=>{cats[k].ways[w]=(cats[k].ways[w]||0)+1;});
+  });
+  const sorted = Object.entries(cats).sort((a,b)=>b[1].dn-a[1].dn);
+  document.getElementById('tbCat').innerHTML = sorted.map(([cat,d])=>{
+    const avgR = d.rates.length ? d.rates.reduce((s,v)=>s+v,0)/d.rates.length : 0;
+    const topWay = Object.entries(d.ways).sort((a,b)=>b[1]-a[1])[0]?.[0] || '–';
+    return `<tr>
+      <td><strong>${escH(cat)}</strong></td>
+      <td class="nr">${d.cnt}</td>
+      <td class="nr">${fmtN(d.dn)}</td>
+      <td class="nr">${fmtN(d.fy27)}</td>
+      <td class="nr">${fmtN(d.award)}</td>
+      <td class="nr">${avgR?(avgR*100).toFixed(2)+'%':'–'}</td>
+      <td class="mu">${escH(topWay)}</td>
+    </tr>`;
+  }).join('');
+}
+
+/* ── BUYER ── */
+function renderBuyer() {
+  const buyers = {};
+  allRecords.forEach(r => {
+    const b = r.buyer;
+    if (!buyers[b]) buyers[b]={cnt:0,dn:0,fy27:0,fy28:0,award:0,rates:[],roles:{},cats:{}};
+    buyers[b].cnt++; buyers[b].dn+=r.dn; buyers[b].fy27+=r.fy27;
+    buyers[b].fy28+=r.fy28; buyers[b].award+=r.award;
+    if (r.rate>0) buyers[b].rates.push(r.rate);
+    buyers[b].roles[r.role]=(buyers[b].roles[r.role]||0)+1;
+    buyers[b].cats[r.cat]=(buyers[b].cats[r.cat]||0)+1;
+  });
+  const sorted = Object.entries(buyers).sort((a,b)=>b[1].dn-a[1].dn);
+  document.getElementById('tbBuyer').innerHTML = sorted.map(([name,d])=>{
+    const avgR = d.rates.length ? (d.rates.reduce((s,v)=>s+v,0)/d.rates.length*100).toFixed(2)+'%' : '–';
+    const topRole = Object.entries(d.roles).sort((a,b)=>b[1]-a[1])[0]?.[0]||'–';
+    const topCat  = Object.entries(d.cats).sort((a,b)=>b[1]-a[1])[0]?.[0]||'–';
+    return `<tr>
+      <td><strong>${escH(name)}</strong></td>
+      <td class="nr">${d.cnt}</td>
+      <td class="nr">${fmtN(d.dn)}</td>
+      <td class="nr">${fmtN(d.fy27)}</td>
+      <td class="nr">${fmtN(d.fy28)}</td>
+      <td class="nr">${fmtN(d.award)}</td>
+      <td class="nr">${avgR}</td>
+      <td><span class="badge b-${escH(topRole)}">${escH(topRole)}</span></td>
+      <td class="mu">${escH(topCat)}</td>
+    </tr>`;
+  }).join('');
+
+  // 柱状图 Top10
+  const top10 = sorted.slice(0,10);
+  if (ci.bamt) ci.bamt.destroy();
+  ci.bamt = new Chart(document.getElementById('cBuyerAmt'),{
+    type:'bar',
+    data:{ labels:top10.map(x=>x[0]),
+      datasets:[{label:'系统降本',data:top10.map(x=>x[1].dn),backgroundColor:'#34d399',borderRadius:4}] },
+    options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{x:{ticks:{callback:v=>fmtW(v)}}} }
+  });
+
+  const byRate = sorted.filter(x=>x[1].rates.length>0)
+    .map(([n,d])=>[n,(d.rates.reduce((s,v)=>s+v,0)/d.rates.length)])
+    .sort((a,b)=>b[1]-a[1]).slice(0,10);
+  if (ci.brate) ci.brate.destroy();
+  ci.brate = new Chart(document.getElementById('cBuyerRate'),{
+    type:'bar',
+    data:{ labels:byRate.map(x=>x[0]),
+      datasets:[{label:'平均降本率',data:byRate.map(x=>x[1]*100),backgroundColor:'#f59e0b',borderRadius:4}] },
+    options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{x:{ticks:{callback:v=>v.toFixed(1)+'%'}}} }
+  });
+}
+
+/* ── LIST ── */
+function renderList() {
+  const q     = (document.getElementById('fSearch').value||'').toLowerCase();
+  const cat   = document.getElementById('fCat').value;
+  const role  = document.getElementById('fRole').value;
+  const buyer = document.getElementById('fBuyer').value;
+  let recs = allRecords.filter(r => {
+    if (q && !r.name.toLowerCase().includes(q) && !r.searchId.toLowerCase().includes(q) && !r.supplier.toLowerCase().includes(q)) return false;
+    if (cat   && r.cat   !== cat)   return false;
+    if (role  && r.role  !== role)  return false;
+    if (buyer && r.buyer !== buyer) return false;
+    return true;
+  });
+  document.getElementById('lCount').textContent = recs.length + '条';
+  document.getElementById('tbList').innerHTML = recs.map(r => `<tr>
+    <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escH(r.name)}">${escH(r.name)}</td>
+    <td>${escH(r.buyer)}</td>
+    <td>${escH(r.cat)}</td>
+    <td><span class="badge b-${escH(r.role)}">${escH(r.role)}</span></td>
+    <td class="nr">${fmtN(r.dn)}</td>
+    <td class="nr">${r.rate?(r.rate*100).toFixed(2)+'%':'–'}</td>
+    <td class="nr">${fmtN(r.award)}</td>
+    <td class="mu" style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escH((r.ways||[]).join('、'))}</td>
+    <td class="mu">${r.createDateStr||'–'}</td>
+    <td class="mu" style="max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escH(r.supplier)}">${escH(r.supplier||'–')}</td>
+  </tr>`).join('');
+}
+
+function populateFilters() {
+  const cats   = [...new Set(allRecords.map(r=>r.cat).filter(Boolean))].sort();
+  const buyers = [...new Set(allRecords.map(r=>r.buyer).filter(Boolean))].sort();
+  const cs = document.getElementById('fCat');
+  cs.innerHTML = '<option value="">所有品类</option>';
+  cats.forEach(c=>cs.add(new Option(c,c)));
+  const bs = document.getElementById('fBuyer');
+  bs.innerHTML = '<option value="">所有采购员</option>';
+  buyers.forEach(b=>bs.add(new Option(b,b)));
+}
+
+/* ── NAV ── */
+function showPage(name) {
+  ['overview','analysis','buyer','list'].forEach(n=>{
+    document.getElementById('pg-'+n).classList.toggle('active',n===name);
+    document.getElementById('tab-'+n).classList.toggle('active',n===name);
+  });
+  if (!pageRendered[name]) {
+    if (name==='analysis') renderAnalysis();
+    if (name==='buyer')    renderBuyer();
+    if (name==='list')     { populateFilters(); renderList(); }
+    pageRendered[name] = true;
+  }
+}
+
+/* ── REFRESH ── */
+async function refreshData() {
+  pageRendered = {};
+  Object.values(ci).forEach(c=>c&&c.destroy&&c.destroy());
+  Object.keys(ci).forEach(k=>delete ci[k]);
+  try {
+    setLoader('刷新中…');
+    allRecords = await loadAllRecords();
+    hideLoader();
+    setStatus(true, `${allRecords.length} 条记录`);
+    updateKPIs();
+    populateFilters();
+    renderOverview();
+    const active = document.querySelector('.tab.active');
+    if (active) { const pg=active.id.replace('tab-',''); pageRendered={}; showPage(pg); }
+    showToast(`已刷新，共 ${allRecords.length} 条记录`, 'ok');
+  } catch(e) { hideLoader(); setStatus(false,'刷新失败'); showToast('刷新失败：'+e.message,'err'); }
+}
+
+/* ── HELPERS ── */
+const fmtW = n => !n ? '0' : n>=1e8?(n/1e8).toFixed(2)+'亿':n>=1e4?(n/1e4).toFixed(1)+'万':n.toFixed(0)+'元';
+const fmtN = n => (!n||isNaN(n)) ? '–' : n.toLocaleString('zh-CN',{maximumFractionDigits:0});
+const escH = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+function setStatus(ok,msg){document.getElementById('sdot').className='sdot '+(ok?'ok':'err');document.getElementById('slbl').textContent=msg;}
+function setLoader(msg){document.getElementById('ldTxt').textContent=msg;document.getElementById('loaderOv').classList.remove('hidden');}
+function hideLoader(){document.getElementById('loaderOv').classList.add('hidden');}
+function showToast(msg,type){const a=document.getElementById('toastArea');const el=document.createElement('div');el.className=`toast toast-${type==='ok'?'ok':type==='err'?'err':'info'}`;el.textContent=msg;a.appendChild(el);setTimeout(()=>el.remove(),3500);}
+
+window.addEventListener('DOMContentLoaded', initSSO);
+</script>
+</body>
+</html>
