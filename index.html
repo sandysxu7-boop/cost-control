@@ -353,9 +353,8 @@ async function initSSO() {
 
 function redirectSSO() {
   setAuthMsg('正在跳转统一登录…');
-  const relay = encodeURIComponent(window.location.origin + window.location.pathname);
-  const redirectUri = encodeURIComponent(`https://sandysxu7-boop.github.io?relay=${relay}`);
-  window.location.href = `https://sso.100tal.com/sso/login?appid=${SSO_APP_ID}&redirect_uri=${redirectUri}`;
+  sessionStorage.setItem('sso_relay', window.location.href.split('?')[0]);
+  window.location.href = `https://sso.100tal.com/sso/login?appid=${SSO_APP_ID}&redirect_uri=${encodeURIComponent('https://sandysxu7-boop.github.io')}`;
 }
 function setAuthMsg(msg, err) {
   document.getElementById('authMsg').textContent = msg;
