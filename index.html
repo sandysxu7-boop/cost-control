@@ -344,7 +344,7 @@ async function initSSO() {
   if (!jwt) { redirectSSO(); return; }
   try {
     const parts = jwt.split('.');
-    const pl = JSON.parse(atob(parts[1].replace(/-/g,'+').replace(/_/g,'/')));
+    const pl = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(parts[1].replace(/-/g,'+').replace(/_/g,'/')), c => c.charCodeAt(0))));
     if (pl.exp * 1000 < Date.now()) { localStorage.removeItem(JWT_KEY); redirectSSO(); return; }
     currentUser = currentUser || pl;
   } catch { localStorage.removeItem(JWT_KEY); redirectSSO(); return; }
@@ -368,16 +368,21 @@ async function teableGet(path) {
   return r.json();
 }
 
+const ORG_FILTER_QS = encodeURIComponent(JSON.stringify({
+  conjunction: 'and',
+  filterSet: [{ fieldId: 'fld4UTFyxxzVG0qKbpI', operator: 'is', value: ORG_FILTER }]
+}));
+
 async function loadAllRecords() {
   let records = [], skip = 0;
   while (true) {
-    const d = await teableGet(`/api/table/${TABLE_ID}/record?take=1000&skip=${skip}&fieldKeyType=name`);
+    const d = await teableGet(`/api/table/${TABLE_ID}/record?take=1000&skip=${skip}&fieldKeyType=name&filter=${ORG_FILTER_QS}`);
     const batch = d.records || [];
     records = records.concat(batch);
     if (batch.length < 1000) break;
     skip += 1000;
   }
-  return records.filter(r => (r.fields['⭐采购组织'] || '') === ORG_FILTER).map(norm);
+  return records.map(norm);
 }
 
 function norm(r) {
